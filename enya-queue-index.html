@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>えんやどっと丸 | 順番待ち受付</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --navy: #1a2744;
+    --gold: #c8a84b;
+    --gold-light: #e8cc7a;
+    --cream: #fdf8f0;
+    --red: #c0392b;
+    --text: #1a2744;
+    --gray: #8a8a8a;
+    --border: #ddd5c0;
+  }
+
+  body {
+    font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    background: var(--navy);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .card {
+    background: var(--cream);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+  }
+
+  .card-header {
+    background: var(--navy);
+    padding: 20px 24px 16px;
+    text-align: center;
+    border-bottom: 3px solid var(--gold);
+  }
+
+  .store-name {
+    color: var(--gold);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+  }
+
+  .store-sub {
+    color: rgba(255,255,255,0.6);
+    font-size: 12px;
+    margin-top: 2px;
+    letter-spacing: 0.08em;
+  }
+
+  .card-body {
+    padding: 28px 24px;
+  }
+
+  /* ステップインジケーター */
+  .steps {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 28px;
+  }
+
+  .step-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+  }
+
+  .step-dot.active {
+    background: var(--gold);
+    width: 24px;
+    border-radius: 4px;
+  }
+
+  .step-dot.done {
+    background: var(--navy);
+  }
+
+  /* 画面 */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .screen-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--navy);
+    text-align: center;
+    margin-bottom: 8px;
+    letter-spacing: 0.04em;
+  }
+
+  .screen-desc {
+    font-size: 13px;
+    color: var(--gray);
+    text-align: center;
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  /* 注意書き */
+  .notice-box {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+
+  .notice-box p {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.8;
+  }
+
+  .notice-box p + p {
+    margin-top: 8px;
+  }
+
+  /* 人数選択 */
+  .count-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .count-btn {
+    aspect-ratio: 1;
+    background: #fff;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--navy);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+
+  .count-btn span.unit {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--gray);
+  }
+
+  .count-btn:active {
+    transform: scale(0.95);
+  }
+
+  .count-btn.selected {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: #fff;
+  }
+
+  .count-btn.selected span.unit {
+    color: rgba(255,255,255,0.7);
+  }
+
+  /* 名前入力 */
+  .name-input {
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 18px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--navy);
+    font-family: inherit;
+    outline: none;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+
+  .name-input:focus {
+    border-color: var(--gold);
+  }
+
+  .name-hint {
+    font-size: 12px;
+    color: var(--gray);
+    margin-bottom: 24px;
+  }
+
+  /* QRコード画面 */
+  .qr-box {
+    background: #fff;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .qr-box img {
+    width: 180px;
+    height: 180px;
+    display: block;
+    margin: 0 auto 12px;
+  }
+
+  .qr-label {
+    font-size: 13px;
+    color: var(--gray);
+    line-height: 1.6;
+  }
+
+  .line-steps {
+    background: #f0f9f0;
+    border: 1px solid #b8ddb8;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+  }
+
+  .line-steps p {
+    font-size: 13px;
+    color: #2d6a2d;
+    line-height: 1.8;
+  }
+
+  /* 完了画面 */
+  .complete-icon {
+    width: 72px;
+    height: 72px;
+    background: var(--navy);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+  }
+
+  .complete-icon svg {
+    width: 36px;
+    height: 36px;
+  }
+
+  .wait-info {
+    background: #fff;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .wait-label {
+    font-size: 13px;
+    color: var(--gray);
+    margin-bottom: 4px;
+  }
+
+  .wait-number {
+    font-size: 52px;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1;
+  }
+
+  .wait-unit {
+    font-size: 16px;
+    color: var(--gray);
+    margin-top: 4px;
+  }
+
+  .wait-my-info {
+    font-size: 14px;
+    color: var(--text);
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .wait-note {
+    font-size: 12px;
+    color: var(--gray);
+    text-align: center;
+    line-height: 1.7;
+    margin-bottom: 8px;
+  }
+
+  /* ボタン */
+  .btn-primary {
+    width: 100%;
+    padding: 16px;
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+
+  .btn-primary:active {
+    transform: scale(0.98);
+    background: #0f1a33;
+  }
+
+  .btn-primary:disabled {
+    background: var(--border);
+    color: var(--gray);
+    cursor: not-allowed;
+  }
+
+  .btn-back {
+    display: block;
+    text-align: center;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--gray);
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  /* 選択サマリー */
+  .selection-summary {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--navy);
+    margin-bottom: 20px;
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+  }
+
+  .selection-summary span {
+    color: var(--gray);
+  }
+
+  .loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--gray);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="card-header">
+    <div class="store-name">えんやどっと丸</div>
+    <div class="store-sub">順番待ち受付</div>
+  </div>
+
+  <div class="card-body">
+    <!-- ステップドット -->
+    <div class="steps" id="steps">
+      <div class="step-dot active" id="dot0"></div>
+      <div class="step-dot" id="dot1"></div>
+      <div class="step-dot" id="dot2"></div>
+      <div class="step-dot" id="dot3"></div>
+      <div class="step-dot" id="dot4"></div>
+    </div>
+
+    <!-- STEP 0: 注意書き -->
+    <div class="screen active" id="screen0">
+      <div class="screen-title">ご来店ありがとうございます</div>
+      <p class="screen-desc">順番になりましたらLINEでお知らせします</p>
+
+      <div class="notice-box">
+        <p>・店内混雑のため、外のお車内でお待ちいただくこともございます。</p>
+        <p>・ご案内の順番は前後することがあります。</p>
+        <p>・2回お呼び出しした際にご不在の場合は、キャンセルとさせていただく場合がございます。</p>
+      </div>
+
+      <button class="btn-primary" onclick="goStep(1)">受付をはじめる</button>
+    </div>
+
+    <!-- STEP 1: 大人人数 -->
+    <div class="screen" id="screen1">
+      <div class="screen-title">大人の人数</div>
+      <p class="screen-desc">中学生以上の人数をお選びください</p>
+
+      <div class="count-grid" id="adult-grid">
+        <!-- JS生成 -->
+      </div>
+
+      <button class="btn-primary" id="btn-adult" onclick="goStep(2)" disabled>次へ</button>
+      <span class="btn-back" onclick="goStep(0)">← 戻る</span>
+    </div>
+
+    <!-- STEP 2: 子ども人数 -->
+    <div class="screen" id="screen2">
+      <div class="screen-title">子どもの人数</div>
+      <p class="screen-desc">小学生以下の人数をお選びください</p>
+
+      <div class="count-grid" id="child-grid">
+        <!-- JS生成 -->
+      </div>
+
+      <button class="btn-primary" id="btn-child" onclick="goStep(3)" disabled>次へ</button>
+      <span class="btn-back" onclick="goStep(1)">← 戻る</span>
+    </div>
+
+    <!-- STEP 3: 名前入力 -->
+    <div class="screen" id="screen3">
+      <div class="screen-title">お名前</div>
+      <p class="screen-desc">呼び出し時に使用します（苗字のみでOK）</p>
+
+      <div class="selection-summary">
+        <span>大人</span><strong id="summary-adult">-</strong>名　
+        <span>子ども</span><strong id="summary-child">-</strong>名
+      </div>
+
+      <input type="text" class="name-input" id="name-input"
+        placeholder="例：清水" maxlength="10"
+        oninput="checkName()">
+      <p class="name-hint">※ 10文字以内でご入力ください</p>
+
+      <button class="btn-primary" id="btn-name" onclick="goStep(4)" disabled>次へ</button>
+      <span class="btn-back" onclick="goStep(2)">← 戻る</span>
+    </div>
+
+    <!-- STEP 4: LINE友だち追加 -->
+    <div class="screen" id="screen4">
+      <div class="screen-title">LINEで受け取る</div>
+      <p class="screen-desc">呼び出し通知をLINEでお送りします</p>
+
+      <div class="qr-box">
+        <img src="https://qr-official.line.me/gs/M_191oqpdl_GW.png?oat_content=qr" alt="LINE友だち追加QRコード">
+        <p class="qr-label">カメラでQRコードを読み取り<br>「えんやどっと丸」を友だち追加してください</p>
+      </div>
+
+      <div class="line-steps">
+        <p>① LINEアプリを開く</p>
+        <p>② QRコードを読み取る</p>
+        <p>③「友だち追加」をタップ</p>
+        <p>④ 追加後、下のボタンを押す</p>
+      </div>
+
+      <button class="btn-primary" id="btn-register" onclick="registerQueue()">受付を完了する</button>
+      <span class="btn-back" onclick="goStep(3)">← 戻る</span>
+    </div>
+
+    <!-- STEP 5: 完了 -->
+    <div class="screen" id="screen5">
+      <div class="complete-icon">
+        <svg viewBox="0 0 36 36" fill="none">
+          <path d="M8 18l7 7L28 11" stroke="#c8a84b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <div class="screen-title">受付完了しました</div>
+
+      <div class="wait-info">
+        <div class="wait-label">現在の待ち組数</div>
+        <div class="wait-number" id="wait-count">-</div>
+        <div class="wait-unit">組待ち</div>
+        <div class="wait-my-info" id="my-info"></div>
+      </div>
+
+      <p class="wait-note">
+        順番になりましたらLINEにご連絡します<br>
+        店内またはお車でお待ちください
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getDatabase, ref, push, onValue, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC6HkSHYl_-hsDVdxGXz8NqJFMJv0KK_OU",
+  authDomain: "wcsa-shift.firebaseapp.com",
+  databaseURL: "https://wcsa-shift-default-rtdb.firebaseio.com",
+  projectId: "wcsa-shift",
+  storageBucket: "wcsa-shift.appspot.com",
+  messagingSenderId: "520358755238",
+  appId: "1:520358755238:web:ec0a3c46a9a8e9cdb1c53a"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const queueRef = ref(db, 'enya-queue');
+
+// グローバルに公開
+window._db = db;
+window._queueRef = queueRef;
+window._push = push;
+window._onValue = onValue;
+window._serverTimestamp = serverTimestamp;
+window._ref = ref;
+
+// 待ち人数をリアルタイム監視（完了画面用）
+onValue(queueRef, (snapshot) => {
+  const data = snapshot.val();
+  let count = 0;
+  if (data) {
+    Object.values(data).forEach(v => {
+      if (v.status === 'waiting') count++;
+    });
+  }
+  const el = document.getElementById('wait-count');
+  if (el) el.textContent = count;
+});
+</script>
+
+<script>
+let selectedAdult = null;
+let selectedChild = null;
+let currentStep = 0;
+
+// 人数ボタン生成
+function buildCountGrid(gridId, maxCount, selectedVar, btnId, onSelect) {
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = '';
+  for (let i = 1; i <= maxCount; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'count-btn';
+    btn.innerHTML = `${i}<span class="unit">名</span>`;
+    btn.onclick = () => onSelect(i);
+    grid.appendChild(btn);
+  }
+  // 「0名」は子どものみ
+  if (gridId === 'child-grid') {
+    const zeroBtn = document.createElement('button');
+    zeroBtn.className = 'count-btn';
+    zeroBtn.innerHTML = `0<span class="unit">名</span>`;
+    zeroBtn.onclick = () => onSelect(0);
+    grid.insertBefore(zeroBtn, grid.firstChild);
+  }
+}
+
+function selectAdult(n) {
+  selectedAdult = n;
+  document.querySelectorAll('#adult-grid .count-btn').forEach((btn, i) => {
+    btn.classList.toggle('selected', i + 1 === n);
+  });
+  document.getElementById('btn-adult').disabled = false;
+}
+
+function selectChild(n) {
+  selectedChild = n;
+  const btns = document.querySelectorAll('#child-grid .count-btn');
+  btns.forEach((btn, i) => {
+    btn.classList.toggle('selected', i === n);
+  });
+  document.getElementById('btn-child').disabled = false;
+}
+
+function checkName() {
+  const val = document.getElementById('name-input').value.trim();
+  document.getElementById('btn-name').disabled = val.length === 0;
+}
+
+function goStep(step) {
+  // 人数グリッド初期化（初回のみ）
+  if (step === 1 && document.getElementById('adult-grid').children.length === 0) {
+    buildCountGrid('adult-grid', 8, selectedAdult, 'btn-adult', selectAdult);
+  }
+  if (step === 2 && document.getElementById('child-grid').children.length === 0) {
+    buildCountGrid('child-grid', 7, selectedChild, 'btn-child', selectChild);
+  }
+  if (step === 3) {
+    document.getElementById('summary-adult').textContent = selectedAdult;
+    document.getElementById('summary-child').textContent = selectedChild;
+  }
+
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen' + step).classList.add('active');
+
+  // ステップドット更新
+  for (let i = 0; i < 5; i++) {
+    const dot = document.getElementById('dot' + i);
+    dot.className = 'step-dot';
+    if (i === step) dot.classList.add('active');
+    else if (i < step) dot.classList.add('done');
+  }
+
+  currentStep = step;
+  window.scrollTo(0, 0);
+}
+
+async function registerQueue() {
+  const name = document.getElementById('name-input').value.trim();
+  if (!name) return;
+
+  const btn = document.getElementById('btn-register');
+  btn.disabled = true;
+  btn.textContent = '登録中...';
+
+  try {
+    const entry = {
+      name: name,
+      adult: selectedAdult,
+      child: selectedChild,
+      total: selectedAdult + selectedChild,
+      status: 'waiting',
+      createdAt: window._serverTimestamp()
+    };
+
+    await window._push(window._queueRef, entry);
+
+    // 完了画面
+    document.getElementById('my-info').textContent =
+      `${name} 様　大人${selectedAdult}名・子ども${selectedChild}名`;
+    goStep(5);
+
+    // ステップドット非表示
+    document.getElementById('steps').style.display = 'none';
+
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '受付を完了する';
+    alert('エラーが発生しました。もう一度お試しください。');
+  }
+}
+
+window.goStep = goStep;
+window.registerQueue = registerQueue;
+window.selectAdult = selectAdult;
+window.selectChild = selectChild;
+window.checkName = checkName;
+</script>
+</body>
+</html>

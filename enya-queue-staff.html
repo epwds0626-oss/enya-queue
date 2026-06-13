@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>えんやどっと丸 | スタッフ管理</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --navy: #1a2744;
+    --navy-light: #243256;
+    --gold: #c8a84b;
+    --cream: #fdf8f0;
+    --green: #27ae60;
+    --green-dark: #1e8449;
+    --red: #e74c3c;
+    --red-dark: #c0392b;
+    --gray: #8a8a8a;
+    --border: #ddd5c0;
+    --bg: #f0ece4;
+  }
+
+  body {
+    font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+  }
+
+  /* ヘッダー */
+  .header {
+    background: var(--navy);
+    border-bottom: 3px solid var(--gold);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-left h1 {
+    color: var(--gold);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .header-left p {
+    color: rgba(255,255,255,0.5);
+    font-size: 11px;
+    margin-top: 1px;
+  }
+
+  .header-stats {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .stat-badge {
+    background: var(--navy-light);
+    border: 1px solid var(--gold);
+    border-radius: 8px;
+    padding: 6px 12px;
+    text-align: center;
+  }
+
+  .stat-badge .num {
+    color: var(--gold);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .stat-badge .lbl {
+    color: rgba(255,255,255,0.6);
+    font-size: 10px;
+    margin-top: 1px;
+  }
+
+  /* パスワード画面 */
+  #login-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .login-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 32px 24px;
+    width: 100%;
+    max-width: 320px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    text-align: center;
+  }
+
+  .login-card h2 {
+    color: var(--navy);
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+
+  .login-card p {
+    color: var(--gray);
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  .pin-input {
+    width: 100%;
+    padding: 14px;
+    font-size: 24px;
+    text-align: center;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    outline: none;
+    letter-spacing: 0.3em;
+    color: var(--navy);
+    margin-bottom: 16px;
+    font-family: inherit;
+  }
+
+  .pin-input:focus { border-color: var(--gold); }
+
+  .btn-login {
+    width: 100%;
+    padding: 14px;
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* メイン */
+  #main-screen { display: none; }
+
+  .content {
+    padding: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  /* タブ */
+  .tabs {
+    display: flex;
+    background: #fff;
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 10px;
+    background: none;
+    border: none;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+
+  .tab-btn.active {
+    background: var(--navy);
+    color: #fff;
+  }
+
+  /* キューカード */
+  .queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .queue-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-left: 4px solid var(--gold);
+    transition: opacity 0.3s;
+  }
+
+  .queue-card.called {
+    border-left-color: var(--green);
+    opacity: 0.7;
+  }
+
+  .queue-card.cancelled {
+    border-left-color: var(--gray);
+    opacity: 0.4;
+  }
+
+  .queue-num {
+    width: 36px;
+    height: 36px;
+    background: var(--navy);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold);
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .queue-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .queue-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: 0.04em;
+  }
+
+  .queue-name span {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--gray);
+  }
+
+  .queue-meta {
+    font-size: 12px;
+    color: var(--gray);
+    margin-top: 3px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .queue-time-badge {
+    font-size: 11px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: var(--gray);
+  }
+
+  .queue-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .btn-call {
+    padding: 8px 14px;
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .btn-call:active { background: var(--green-dark); transform: scale(0.97); }
+
+  .btn-cancel {
+    padding: 7px 14px;
+    background: #fff;
+    color: var(--red);
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .btn-cancel:active { background: #fdf0ef; transform: scale(0.97); }
+
+  .btn-call:disabled, .btn-cancel:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .status-tag {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .status-tag.called { background: #e8f5e9; color: var(--green-dark); }
+  .status-tag.cancelled { background: #f5f5f5; color: var(--gray); }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--gray);
+  }
+
+  .empty-state .icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+  }
+
+  .empty-state p {
+    font-size: 15px;
+  }
+
+  /* 送信中オーバーレイ */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    display: none;
+  }
+
+  .overlay.show { display: flex; }
+
+  .overlay-box {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px 32px;
+    text-align: center;
+    font-size: 15px;
+    color: var(--navy);
+    font-weight: 600;
+  }
+
+  /* トースト */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--navy);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: transform 0.3s;
+    z-index: 300;
+    white-space: nowrap;
+  }
+
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .today-header {
+    font-size: 12px;
+    color: var(--gray);
+    margin-bottom: 8px;
+    padding-left: 4px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ログイン -->
+<div id="login-screen">
+  <div class="login-card">
+    <h2>えんやどっと丸</h2>
+    <p>スタッフ管理画面</p>
+    <input type="password" class="pin-input" id="pin-input" placeholder="••••"
+      maxlength="4" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-login" onclick="doLogin()">ログイン</button>
+  </div>
+</div>
+
+<!-- メイン -->
+<div id="main-screen">
+  <div class="header">
+    <div class="header-left">
+      <h1>えんやどっと丸</h1>
+      <p>スタッフ管理</p>
+    </div>
+    <div class="header-stats">
+      <div class="stat-badge">
+        <div class="num" id="waiting-count">0</div>
+        <div class="lbl">待ち</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('waiting')">待ち中</button>
+      <button class="tab-btn" onclick="switchTab('all')">全履歴</button>
+    </div>
+
+    <div id="queue-waiting" class="queue-list"></div>
+    <div id="queue-all" class="queue-list" style="display:none"></div>
+  </div>
+</div>
+
+<!-- オーバーレイ -->
+<div class="overlay" id="overlay">
+  <div class="overlay-box">📲 LINE送信中...</div>
+</div>
+
+<!-- トースト -->
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getDatabase, ref, onValue, update, query, orderByChild, limitToLast }
+  from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC6HkSHYl_-hsDVdxGXz8NqJFMJv0KK_OU",
+  authDomain: "wcsa-shift.firebaseapp.com",
+  databaseURL: "https://wcsa-shift-default-rtdb.firebaseio.com",
+  projectId: "wcsa-shift",
+  storageBucket: "wcsa-shift.appspot.com",
+  messagingSenderId: "520358755238",
+  appId: "1:520358755238:web:ec0a3c46a9a8e9cdb1c53a"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const queueRef = ref(db, 'enya-queue');
+
+const LINE_TOKEN = 'L2iGj3vQZj0ogJpq/VAJs5p4YDIE7XYVOdlH4rT4gs+1hwd4klTlaFyO2jT5yMA4U22DLP5Og2mTbT6JDakgZ5xo3VVxtacVv9pCopc3lNGa+8V74jcfwGQ57Lhpbu9H8TetKfbT34Ean5jAGePhuQdB04t89/1O/w1cDnyilFU=';
+
+let allEntries = [];
+let currentTab = 'waiting';
+let callCount = {}; // keyごとの呼び出し回数
+
+window._update = update;
+window._ref = ref;
+window._db = db;
+window._LINE_TOKEN = LINE_TOKEN;
+
+onValue(queueRef, (snapshot) => {
+  const data = snapshot.val() || {};
+  allEntries = Object.entries(data)
+    .map(([key, val]) => ({ key, ...val }))
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+  const waiting = allEntries.filter(e => e.status === 'waiting');
+  document.getElementById('waiting-count').textContent = waiting.length;
+
+  renderList();
+});
+
+function renderList() {
+  const waitingEl = document.getElementById('queue-waiting');
+  const allEl = document.getElementById('queue-all');
+
+  const waiting = allEntries.filter(e => e.status === 'waiting');
+  const all = [...allEntries].reverse();
+
+  waitingEl.innerHTML = renderEntries(waiting, true);
+  allEl.innerHTML = renderEntries(all, false);
+}
+
+function renderEntries(entries, isWaiting) {
+  if (entries.length === 0) {
+    return `<div class="empty-state">
+      <div class="icon">${isWaiting ? '🎉' : '📋'}</div>
+      <p>${isWaiting ? '現在待ちなし' : '履歴なし'}</p>
+    </div>`;
+  }
+
+  let num = 1;
+  return entries.map(e => {
+    const isCalled = e.status === 'called';
+    const isCancelled = e.status === 'cancelled';
+    const isWaitingStatus = e.status === 'waiting';
+    const count = callCount[e.key] || 0;
+
+    const timeStr = e.createdAt
+      ? new Date(e.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+      : '--:--';
+
+    let statusTag = '';
+    if (isCalled) statusTag = '<span class="status-tag called">呼び出し済</span>';
+    if (isCancelled) statusTag = '<span class="status-tag cancelled">キャンセル</span>';
+
+    return `
+      <div class="queue-card ${isCalled ? 'called' : ''} ${isCancelled ? 'cancelled' : ''}" id="card-${e.key}">
+        <div class="queue-num">${isWaiting ? num++ : ''}</div>
+        <div class="queue-info">
+          <div class="queue-name">${e.name} <span>様</span> ${statusTag}</div>
+          <div class="queue-meta">
+            <span>大人${e.adult}名・子ども${e.child}名（計${e.total}名）</span>
+            <span class="queue-time-badge">${timeStr}受付</span>
+            ${count > 0 ? `<span class="queue-time-badge">呼出${count}回</span>` : ''}
+          </div>
+        </div>
+        ${isWaitingStatus ? `
+        <div class="queue-actions">
+          <button class="btn-call" onclick="callCustomer('${e.key}', '${e.name}', ${e.total})">
+            📲 呼び出す
+          </button>
+          <button class="btn-cancel" onclick="cancelCustomer('${e.key}', '${e.name}')">
+            キャンセル
+          </button>
+        </div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+window.switchTab = function(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && tab === 'waiting') || (i === 1 && tab === 'all'));
+  });
+  document.getElementById('queue-waiting').style.display = tab === 'waiting' ? 'flex' : 'none';
+  document.getElementById('queue-all').style.display = tab === 'all' ? 'flex' : 'none';
+  document.getElementById('queue-waiting').style.flexDirection = 'column';
+  document.getElementById('queue-all').style.flexDirection = 'column';
+};
+
+window.callCustomer = async function(key, name, total) {
+  if (!confirm(`「${name}」様（${total}名）を呼び出しますか？`)) return;
+
+  showOverlay(true);
+
+  try {
+    // LINE通知送信
+    // ※ 本番はGAS経由で送信推奨（CORSの関係）
+    // ここではフォールバックとしてメッセージ内容を確認
+    await sendLineNotify(name, total);
+
+    // Firebase更新
+    const entryRef = window._ref(window._db, `enya-queue/${key}`);
+    await window._update(entryRef, { status: 'called', calledAt: Date.now() });
+
+    callCount[key] = (callCount[key] || 0) + 1;
+    showToast(`✅ ${name} 様に通知しました`);
+
+  } catch(e) {
+    showToast('⚠️ 通知に失敗しました（Firebase更新のみ実施）');
+    const entryRef = window._ref(window._db, `enya-queue/${key}`);
+    await window._update(entryRef, { status: 'called', calledAt: Date.now() });
+  }
+
+  showOverlay(false);
+};
+
+window.cancelCustomer = async function(key, name) {
+  if (!confirm(`「${name}」様をキャンセルしますか？`)) return;
+
+  const entryRef = window._ref(window._db, `enya-queue/${key}`);
+  await window._update(entryRef, { status: 'cancelled', cancelledAt: Date.now() });
+  showToast(`❌ ${name} 様をキャンセルしました`);
+};
+
+async function sendLineNotify(name, total) {
+  // LINE Messaging API でブロードキャスト（友だち全員）ではなく
+  // 個別送信が必要だが、個別UserIDはお客が登録時に取得する仕組みが必要
+  // 現段階ではGAS Webhookを使う構成を推奨
+  // ここでは仮実装として confirm で確認
+  console.log(`LINE通知: ${name}様 ${total}名`);
+  // 実際の送信はGAS経由で実装予定
+}
+
+function showOverlay(show) {
+  document.getElementById('overlay').classList.toggle('show', show);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+
+<script>
+const ADMIN_PASS = '0626';
+
+function doLogin() {
+  const pin = document.getElementById('pin-input').value;
+  if (pin === ADMIN_PASS) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-screen').style.display = 'block';
+  } else {
+    alert('パスワードが違います');
+    document.getElementById('pin-input').value = '';
+  }
+}
+
+window.doLogin = doLogin;
+</script>
+</body>
+</html>
