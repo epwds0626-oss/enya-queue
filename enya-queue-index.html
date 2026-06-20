@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>えんやどっと丸 | 順番待ち受付</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -394,7 +397,8 @@ async function registerQueue(isBell) {
     document.getElementById('steps').style.display = 'none';
     window.scrollTo({ top: 0, behavior: 'smooth' });
     const keyToWatch = window._lastBellKey;
-    alert('登録完了 key=' + keyToWatch);
+    const dbgEl = document.getElementById('bell-checking-msg');
+    if (dbgEl) dbgEl.textContent = '📡 key=' + keyToWatch + ' で監視中...';
     window.startBellCompleteWatch(keyToWatch);
     return;
   }
