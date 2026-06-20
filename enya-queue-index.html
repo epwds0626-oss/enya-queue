@@ -161,27 +161,28 @@
 
     <!-- STEP 4b: ベル待ち（お客様向け） -->
     <div class="screen" id="screen4b">
-      <!-- ベル設定待ち -->
-      <div id="bell-waiting-phase">
-        <div class="bell-waiting-box">
-          <div class="bell-icon">🔔</div>
-          <div class="bell-waiting-title">スタッフをお呼びください</div>
-          <div class="bell-waiting-desc">近くのスタッフにお声がけいただくか<br>レジまでお越しください</div>
-          <div class="bell-waiting-note">呼び出しベルをお受け取りください<br>順番になりましたらベルでお知らせします</div>
-        </div>
-        <p style="font-size:12px;color:var(--gray);text-align:center;line-height:1.7;margin-bottom:16px;">受付番号はスタッフが登録いたします<br>そのままお待ちください</p>
-        <p style="font-size:12px;color:var(--gray);text-align:center;margin-bottom:8px;" id="bell-checking-msg">📡 スタッフの設定を確認中...</p>
+      <div class="bell-waiting-box">
+        <div class="bell-icon">🔔</div>
+        <div class="bell-waiting-title">スタッフをお呼びください</div>
+        <div class="bell-waiting-desc">近くのスタッフにお声がけいただくか<br>レジまでお越しください</div>
+        <div class="bell-waiting-note">スタッフからベルをお受け取りください<br>受け取り後、下のボタンを押してください</div>
       </div>
-      <!-- スタッフがベル番号を設定したら表示 -->
-      <div id="bell-complete-phase" style="display:none;">
-        <div class="bell-waiting-box" style="border-color:var(--green);">
-          <div class="bell-icon">✅</div>
-          <div class="bell-waiting-title" style="color:var(--green);">受付が完了しました</div>
-          <div class="bell-waiting-desc" id="bell-complete-no" style="font-size:18px;font-weight:700;color:var(--navy);margin-top:8px;"></div>
-          <div class="bell-waiting-note" style="color:#1e8449;background:#e8f5e9;">順番になりましたらベルでお知らせします<br>店内またはお車でお待ちください</div>
-        </div>
-        <button class="btn-home" onclick="location.reload()" style="margin-top:8px;">🏠 最初のページに戻る</button>
+      <button class="btn-primary" style="margin-top:8px;background:var(--green);" onclick="completeBellEntry()">✅ ベルを受け取りました</button>
+    </div>
+
+    <!-- STEP 5b: 完了（ベル） -->
+    <div class="screen" id="screen5b">
+      <div class="complete-icon">
+        <svg viewBox="0 0 36 36" fill="none">
+          <path d="M8 18l7 7L28 11" stroke="#c8a84b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </div>
+      <div class="screen-title">受付完了しました</div>
+      <div class="bell-waiting-box" style="margin-bottom:20px;">
+        <div class="bell-icon" style="font-size:36px;">🔔</div>
+        <div class="bell-waiting-desc">順番になりましたらベルでお知らせします<br>店内またはお車でお待ちください</div>
+      </div>
+      <button class="btn-home" onclick="location.reload()">🏠 最初のページに戻る</button>
     </div>
 
     <!-- STEP 5: 完了（LINE） -->
@@ -396,10 +397,7 @@ async function registerQueue(isBell) {
     document.getElementById('screen4b').classList.add('active');
     document.getElementById('steps').style.display = 'none';
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    const keyToWatch = window._lastBellKey;
-    const dbgEl = document.getElementById('bell-checking-msg');
-    if (dbgEl) dbgEl.textContent = '📡 key=' + keyToWatch + ' で監視中...';
-    window.startBellCompleteWatch(keyToWatch);
+    // ベル完了はお客様がボタンで操作
     return;
   }
 
@@ -434,25 +432,10 @@ window.goStep = goStep;
 window.registerQueue = registerQueue;
 window.checkName = checkName;
 
-// ベル設定をonValueリアルタイム監視で検知
-let bellUnsubscribe = null;
-
-window.startBellCompleteWatch = function(key) {
-  if (!key || bellUnsubscribe) return;
-  console.log('[BellWatch] 監視開始 key=', key);
-  const entryRef = ref(db, 'enya-queue/' + key);
-  bellUnsubscribe = onValue(entryRef, (snap) => {
-    if (!snap.exists()) { console.log('[BellWatch] データなし'); return; }
-    const data = snap.val();
-    console.log('[BellWatch] データ取得 bellNo=', data.bellNo, 'needsBell=', data.needsBell);
-    if (data.bellNo && data.needsBell === false) {
-      console.log('[BellWatch] ベル設定検知！');
-      if (bellUnsubscribe) { bellUnsubscribe(); bellUnsubscribe = null; }
-      document.getElementById('bell-waiting-phase').style.display = 'none';
-      document.getElementById('bell-complete-no').textContent = '🔔 ベル ' + data.bellNo + ' 番をお受け取りください';
-      document.getElementById('bell-complete-phase').style.display = 'block';
-    }
-  });
+window.completeBellEntry = function() {
+  document.getElementById('steps').style.display = 'none';
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen5b').classList.add('active');
 };
 </script>
 </body>
