@@ -71,23 +71,28 @@
   .empty-state { text-align:center; padding:48px 20px; color:var(--gray); }
   .empty-state .icon { font-size:48px; margin-bottom:12px; }
 
-  /* ── モーダル ── iPad miniでスクロール可能に */
+  /* ── モーダル ── */
   .modal-overlay {
-    position:fixed; inset:0;
+    position:fixed;
+    top:0; left:0; right:0; bottom:0;
     background:rgba(0,0,0,.55);
     z-index:200;
     display:none;
-    overflow-y:auto;
-    -webkit-overflow-scrolling:touch;
   }
   .modal-overlay.show { display:block; }
   .modal-box {
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
     background:#fff;
     border-radius:16px;
     padding:20px;
-    width:calc(100% - 32px);
+    width:calc(100vw - 32px);
     max-width:360px;
-    margin:40px auto 40px;
+    max-height:calc(100vh - 80px);
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
   }
   .modal-title { font-size:16px; font-weight:700; color:var(--navy); margin-bottom:20px; }
   .form-group { margin-bottom:14px; }
