@@ -7,7 +7,7 @@
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   :root { --navy:#1a2744; --gold:#c8a84b; --cream:#fdf8f0; --text:#1a2744; --gray:#8a8a8a; --border:#ddd5c0; --green:#27ae60; }
-  body { font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif; background:var(--navy); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; }
+  body { font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif; background:var(--navy); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:24px 16px; }
   .card { background:var(--cream); border-radius:16px; width:100%; max-width:420px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,.4); }
   .card-header { background:var(--navy); padding:20px 24px 16px; text-align:center; border-bottom:3px solid var(--gold); }
   .store-name { color:var(--gold); font-size:22px; font-weight:700; letter-spacing:.12em; }
@@ -158,14 +158,27 @@
 
     <!-- STEP 4b: ベル待ち（お客様向け） -->
     <div class="screen" id="screen4b">
-      <div class="bell-waiting-box">
-        <div class="bell-icon">🔔</div>
-        <div class="bell-waiting-title">スタッフをお呼びください</div>
-        <div class="bell-waiting-desc">近くのスタッフにお声がけいただくか<br>レジまでお越しください</div>
-        <div class="bell-waiting-note">呼び出しベルをお受け取りください<br>順番になりましたらベルでお知らせします</div>
+      <!-- ベル設定待ち -->
+      <div id="bell-waiting-phase">
+        <div class="bell-waiting-box">
+          <div class="bell-icon">🔔</div>
+          <div class="bell-waiting-title">スタッフをお呼びください</div>
+          <div class="bell-waiting-desc">近くのスタッフにお声がけいただくか<br>レジまでお越しください</div>
+          <div class="bell-waiting-note">呼び出しベルをお受け取りください<br>順番になりましたらベルでお知らせします</div>
+        </div>
+        <p style="font-size:12px;color:var(--gray);text-align:center;line-height:1.7;margin-bottom:16px;">受付番号はスタッフが登録いたします<br>そのままお待ちください</p>
+        <p style="font-size:12px;color:var(--gray);text-align:center;margin-bottom:8px;" id="bell-checking-msg">📡 スタッフの設定を確認中...</p>
       </div>
-      <p style="font-size:12px;color:var(--gray);text-align:center;line-height:1.7;margin-bottom:16px;">受付番号はスタッフが登録いたします<br>そのままお待ちください</p>
-      <span class="btn-back" onclick="cancelBellAndGoBack()">← 戻る</span>
+      <!-- スタッフがベル番号を設定したら表示 -->
+      <div id="bell-complete-phase" style="display:none;">
+        <div class="bell-waiting-box" style="border-color:var(--green);">
+          <div class="bell-icon">✅</div>
+          <div class="bell-waiting-title" style="color:var(--green);">受付が完了しました</div>
+          <div class="bell-waiting-desc" id="bell-complete-no" style="font-size:18px;font-weight:700;color:var(--navy);margin-top:8px;"></div>
+          <div class="bell-waiting-note" style="color:#1e8449;background:#e8f5e9;">順番になりましたらベルでお知らせします<br>店内またはお車でお待ちください</div>
+        </div>
+        <button class="btn-home" onclick="location.reload()" style="margin-top:8px;">🏠 最初のページに戻る</button>
+      </div>
     </div>
 
     <!-- STEP 5: 完了（LINE） -->
@@ -289,9 +302,7 @@ function goStep(step) {
     document.getElementById('summary-adult').textContent = selectedAdult;
     document.getElementById('summary-child').textContent = selectedChild;
   }
-  // STEP4に入ったらLINE検知監視を開始
   if (step === 4) startLineWatch();
-  // STEP4から離れたら監視を停止
   if (step !== 4) stopLineWatch();
 
   const screenId = (step === '4b') ? 'screen4b' : 'screen' + step;
@@ -305,7 +316,7 @@ function goStep(step) {
     if (i === dotStep) dot.classList.add('active');
     else if (i < dotStep) dot.classList.add('done');
   }
-  window.scrollTo(0, 0);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // LINE検知監視
@@ -315,7 +326,6 @@ let lineWatchActive = false;
 function startLineWatch() {
   if (lineWatchActive) return;
   lineWatchActive = true;
-  // ボタンを待機中スタイルに
   const btn = document.getElementById('btn-register');
   if (btn) {
     btn.textContent = '📲 LINEからの「1」を待っています...';
@@ -324,11 +334,9 @@ function startLineWatch() {
     btn.style.cursor = 'not-allowed';
     btn.onclick = null;
   }
-  // 2秒ごとにFirebaseをポーリング
   lineWatchTimer = setInterval(async () => {
     const userId = await window._getLatestLineUserId();
     if (userId) {
-      // LINE検知！ボタンをアクティブに
       const b = document.getElementById('btn-register');
       if (b) {
         b.textContent = '✅ 受付を完了する';
@@ -349,7 +357,6 @@ function stopLineWatch() {
     clearInterval(lineWatchTimer);
     lineWatchTimer = null;
   }
-  // ボタンを元に戻す（まだSTEP4にいる場合のみ）
   const btn = document.getElementById('btn-register');
   if (btn && btn.style.background === 'rgb(221, 213, 192)') {
     btn.textContent = '受付を完了する';
@@ -365,7 +372,6 @@ async function registerQueue(isBell) {
   if (!name) return;
 
   if (isBell) {
-    // ベルの場合：仮エントリをFirebaseに保存してベル待ち画面へ
     try {
       const entry = {
         name,
@@ -375,22 +381,20 @@ async function registerQueue(isBell) {
         status: 'waiting',
         lineUserId: '',
         isBell: true,
-        bellNo: null, // スタッフが後で入力
+        bellNo: null,
         needsBell: true,
         createdAt: window._serverTimestamp()
       };
       const result = await window._push(window._queueRef, entry);
-      window._lastBellKey = result.key; // 戻る時に削除するためkeyを保存
+      window._lastBellKey = result.key;
     } catch(e) { console.error(e); }
-    // ベル待ち画面へ（ステップバー非表示）
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('screen4b').classList.add('active');
     document.getElementById('steps').style.display = 'none';
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
 
-  // LINE通常フロー
   const btn = document.getElementById('btn-register');
   btn.disabled = true;
   btn.textContent = '登録中...';
