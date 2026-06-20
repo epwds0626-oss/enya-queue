@@ -262,6 +262,7 @@ async function getLatestLineUserId() {
 window._getLatestLineUserId = getLatestLineUserId;
 window._push = push;
 window._remove = remove;
+window._get = get;
 window._ref = (path) => ref(db, path);
 window._queueRef = queueRef;
 window._serverTimestamp = serverTimestamp;
@@ -392,6 +393,7 @@ async function registerQueue(isBell) {
     document.getElementById('screen4b').classList.add('active');
     document.getElementById('steps').style.display = 'none';
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.startBellCompleteWatch();
     return;
   }
 
@@ -426,15 +428,23 @@ window.goStep = goStep;
 window.registerQueue = registerQueue;
 window.checkName = checkName;
 
-window.cancelBellAndGoBack = async function() {
-  if (window._lastBellKey) {
-    try {
-      await window._remove(window._ref('enya-queue/' + window._lastBellKey));
-    } catch(e) { console.error(e); }
-    window._lastBellKey = null;
-  }
-  document.getElementById('steps').style.display = 'flex';
-  goStep(4);
+// ベル設定をonValueリアルタイム監視で検知
+let bellUnsubscribe = null;
+
+window.startBellCompleteWatch = function() {
+  const key = window._lastBellKey;
+  if (!key || bellUnsubscribe) return;
+  const entryRef = ref(db, 'enya-queue/' + key);
+  bellUnsubscribe = onValue(entryRef, (snap) => {
+    if (!snap.exists()) return;
+    const data = snap.val();
+    if (data.bellNo && !data.needsBell) {
+      if (bellUnsubscribe) { bellUnsubscribe(); bellUnsubscribe = null; }
+      document.getElementById('bell-waiting-phase').style.display = 'none';
+      document.getElementById('bell-complete-no').textContent = '🔔 ベル ' + data.bellNo + ' 番をお受け取りください';
+      document.getElementById('bell-complete-phase').style.display = 'block';
+    }
+  });
 };
 </script>
 </body>
