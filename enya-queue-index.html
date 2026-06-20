@@ -393,7 +393,7 @@ async function registerQueue(isBell) {
     document.getElementById('screen4b').classList.add('active');
     document.getElementById('steps').style.display = 'none';
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    window.startBellCompleteWatch();
+    window.startBellCompleteWatch(window._lastBellKey);
     return;
   }
 
@@ -431,14 +431,16 @@ window.checkName = checkName;
 // ベル設定をonValueリアルタイム監視で検知
 let bellUnsubscribe = null;
 
-window.startBellCompleteWatch = function() {
-  const key = window._lastBellKey;
+window.startBellCompleteWatch = function(key) {
   if (!key || bellUnsubscribe) return;
+  console.log('[BellWatch] 監視開始 key=', key);
   const entryRef = ref(db, 'enya-queue/' + key);
   bellUnsubscribe = onValue(entryRef, (snap) => {
-    if (!snap.exists()) return;
+    if (!snap.exists()) { console.log('[BellWatch] データなし'); return; }
     const data = snap.val();
-    if (data.bellNo && !data.needsBell) {
+    console.log('[BellWatch] データ取得 bellNo=', data.bellNo, 'needsBell=', data.needsBell);
+    if (data.bellNo && data.needsBell === false) {
+      console.log('[BellWatch] ベル設定検知！');
       if (bellUnsubscribe) { bellUnsubscribe(); bellUnsubscribe = null; }
       document.getElementById('bell-waiting-phase').style.display = 'none';
       document.getElementById('bell-complete-no').textContent = '🔔 ベル ' + data.bellNo + ' 番をお受け取りください';
