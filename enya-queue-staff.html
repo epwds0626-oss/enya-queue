@@ -76,22 +76,18 @@
     position:fixed; inset:0;
     background:rgba(0,0,0,.55);
     z-index:200;
-    padding:16px;
     display:none;
-    align-items:flex-start;      /* ← 上揃え（centerだと小画面で埋もれる） */
-    justify-content:center;
-    overflow-y:auto;             /* ← モーダル全体をスクロール可能に */
+    overflow-y:auto;
     -webkit-overflow-scrolling:touch;
-    padding-top:40px;
-    padding-bottom:40px;
   }
-  .modal-overlay.show { display:flex; }
+  .modal-overlay.show { display:block; }
   .modal-box {
     background:#fff;
     border-radius:16px;
     padding:20px;
-    width:calc(100% - 16px);
+    width:calc(100% - 32px);
     max-width:360px;
+    margin:40px auto 40px;
   }
   .modal-title { font-size:16px; font-weight:700; color:var(--navy); margin-bottom:20px; }
   .form-group { margin-bottom:14px; }
