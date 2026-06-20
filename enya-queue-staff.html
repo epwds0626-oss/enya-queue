@@ -70,10 +70,30 @@
   .status-tag.reserved { background:#f3e5f5; color:var(--purple); }
   .empty-state { text-align:center; padding:48px 20px; color:var(--gray); }
   .empty-state .icon { font-size:48px; margin-bottom:12px; }
-  /* モーダル共通 */
-  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:200; padding:16px; display:none; align-items:flex-start; justify-content:center; overflow-y:auto; padding-top:60px; }
+
+  /* ── モーダル ── iPad miniでスクロール可能に */
+  .modal-overlay {
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.55);
+    z-index:200;
+    padding:16px;
+    display:none;
+    align-items:flex-start;      /* ← 上揃え（centerだと小画面で埋もれる） */
+    justify-content:center;
+    overflow-y:auto;             /* ← モーダル全体をスクロール可能に */
+    -webkit-overflow-scrolling:touch;
+    padding-top:40px;
+    padding-bottom:40px;
+  }
   .modal-overlay.show { display:flex; }
-  .modal-box { background:#fff; border-radius:16px; padding:24px; width:100%; max-width:380px; }
+  .modal-box {
+    background:#fff;
+    border-radius:16px;
+    padding:24px;
+    width:100%;
+    max-width:380px;
+    /* heightを固定しない・min-heightも不要 */
+  }
   .modal-title { font-size:16px; font-weight:700; color:var(--navy); margin-bottom:20px; }
   .form-group { margin-bottom:14px; }
   .form-label { font-size:12px; color:var(--gray); margin-bottom:5px; display:block; }
@@ -83,6 +103,7 @@
   .modal-actions { display:flex; gap:10px; margin-top:20px; }
   .btn-modal-cancel { flex:1; padding:14px; background:#fff; color:var(--gray); border:1px solid var(--border); border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; min-height:48px; }
   .btn-modal-submit { flex:2; padding:14px; background:var(--navy); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; min-height:48px; }
+
   /* ベルグリッド */
   .bell-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:8px; }
   .bell-btn { padding:12px 4px; background:#fff; border:2px solid var(--border); border-radius:8px; font-size:16px; font-weight:700; color:var(--navy); cursor:pointer; text-align:center; }
@@ -230,7 +251,6 @@ function renderEntries(entries, mode) {
       : (e.bellNo ? `<div class="queue-bell">🔔 ベル${e.bellNo}番</div>` : '');
     const noteHtml = e.note ? `<div class="queue-note">📝 ${e.note}</div>` : '';
     const lineIcon = (!e.isBell && e.lineUserId) ? '📲' : '';
-    // 待ち中・呼び出し済はメモ欄を表示
     const memoHtml = (e.status === 'waiting' || e.status === 'called')
       ? `<div class="memo-area">
           <input class="memo-input" id="memo-${e.key}" type="text" placeholder="メモを入力..." maxlength="40" value="${(e.staffMemo||'').replace(/"/g,'&quot;')}" onkeydown="if(event.key==='Enter')saveMemo('${e.key}')">
@@ -275,13 +295,11 @@ function renderEntries(entries, mode) {
   }).join('');
 }
 
-// ベルモーダルを開く
 window.openBellModal = function(key, name) {
   bellTargetKey = key;
   selectedBellNo = null;
   document.getElementById('bell-modal-name').textContent = name + ' 様にベルをお渡しください';
   document.getElementById('btn-bell-submit').disabled = true;
-  // グリッド生成（初回のみ）
   const grid = document.getElementById('bell-grid');
   if (!grid.children.length) {
     for (let i = 1; i <= 20; i++) {
