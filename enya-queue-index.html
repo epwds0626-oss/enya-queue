@@ -393,7 +393,9 @@ async function registerQueue(isBell) {
     document.getElementById('screen4b').classList.add('active');
     document.getElementById('steps').style.display = 'none';
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    window.startBellCompleteWatch(window._lastBellKey);
+    const keyToWatch = window._lastBellKey;
+    alert('登録完了 key=' + keyToWatch);
+    window.startBellCompleteWatch(keyToWatch);
     return;
   }
 
