@@ -166,8 +166,8 @@
       <input type="text" class="form-input" id="r-note" placeholder="例：法事 8名様" maxlength="50">
     </div>
     <div class="modal-actions">
-      <button class="btn-modal-cancel" ontouchend="closeModal('reserve-modal')" onclick="closeModal('reserve-modal')">閉じる</button>
-      <button class="btn-modal-submit" ontouchend="submitReserve()" onclick="submitReserve()">登録する</button>
+      <button class="btn-modal-cancel" onclick="closeModal('reserve-modal')">閉じる</button>
+      <button class="btn-modal-submit" onclick="submitReserve()">登録する</button>
     </div>
   </div>
 </div>
@@ -180,8 +180,8 @@
     <div class="bell-grid" id="bell-grid"></div>
     <p style="font-size:12px;color:var(--gray);margin-top:8px;margin-bottom:0;">選択後、ベルをお客様にお渡しください</p>
     <div class="modal-actions">
-      <button class="btn-modal-cancel" ontouchend="closeModal('bell-modal')" onclick="closeModal('bell-modal')">閉じる</button>
-      <button class="btn-modal-submit" id="btn-bell-submit" ontouchend="submitBell()" onclick="submitBell()" disabled>確定する</button>
+      <button class="btn-modal-cancel" onclick="closeModal('bell-modal')">閉じる</button>
+      <button class="btn-modal-submit" id="btn-bell-submit" onclick="submitBell()" disabled>確定する</button>
     </div>
   </div>
 </div>
@@ -307,7 +307,7 @@ window.openBellModal = function(key, name) {
       btn.className = 'bell-btn';
       btn.textContent = i;
       const n = i;
-      btn.ontouchend = btn.onclick = (ev) => {
+      btn.onclick = (ev) => {
         ev.preventDefault();
         selectedBellNo = n;
         document.querySelectorAll('.bell-btn').forEach((b,j) => b.classList.toggle('selected', j+1===n));
@@ -388,16 +388,24 @@ window.openReserveModal = function() {
   document.body.style.overflow = 'hidden';
 };
 
+// 二重送信ガード
+let isSubmitting = false;
 window.submitReserve = async function() {
+  if (isSubmitting) return;
   const name  = document.getElementById('r-name').value.trim();
   const adult = parseInt(document.getElementById('r-adult').value) || 0;
   const child = parseInt(document.getElementById('r-child').value) || 0;
   const note  = document.getElementById('r-note').value.trim();
   if (!name) { alert('お名前を入力してください'); return; }
   if (adult + child === 0) { alert('人数を入力してください'); return; }
-  await push(queueRef, { name, adult, child, total:adult+child, status:'waiting', lineUserId:'', isReserved:true, note:note||'', createdAt:serverTimestamp() });
-  closeModal('reserve-modal');
-  showToast('📋 ' + name + ' 様を登録しました');
+  isSubmitting = true;
+  try {
+    await push(queueRef, { name, adult, child, total:adult+child, status:'waiting', lineUserId:'', isReserved:true, note:note||'', createdAt:serverTimestamp() });
+    closeModal('reserve-modal');
+    showToast('📋 ' + name + ' 様を登録しました');
+  } finally {
+    isSubmitting = false;
+  }
 };
 
 window.closeModal = function(id) {
