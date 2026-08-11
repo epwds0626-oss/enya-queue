@@ -77,6 +77,15 @@
   .btn-back { display:block; text-align:center; margin-top:14px; font-size:13px; color:var(--gray); cursor:pointer; padding:4px; }
   .selection-summary { background:#fff; border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:13px; color:var(--navy); margin-bottom:20px; display:flex; gap:16px; justify-content:center; }
   .selection-summary span { color:var(--gray); }
+  @keyframes wobble {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-6px); }
+    30% { transform: translateX(6px); }
+    45% { transform: translateX(-5px); }
+    60% { transform: translateX(5px); }
+    75% { transform: translateX(-3px); }
+  }
+  .btn-waiting-wobble { animation: wobble 1.2s ease-in-out infinite; }
 </style>
 </head>
 <body>
@@ -151,7 +160,7 @@
       </div>
       <div class="line-steps">
         <p>① えんやどっと丸のLINEを開く</p>
-        <p>② トーク画面で<strong style="font-size:15px;color:#1a5c1a;">「1」と送信</strong>してください</p>
+        <p style="color:#d32f2f;font-weight:700;">② トーク画面で<strong style="font-size:16px;color:#d32f2f;">「1」と送信</strong>してください</p>
         <p>③ 受付ボタンが緑色に変わったら押してください</p>
       </div>
       <button class="btn-primary" id="btn-register" onclick="registerQueue(false)">受付を完了する</button>
@@ -338,12 +347,14 @@ function startLineWatch() {
     btn.style.color = '#8a8a8a';
     btn.style.cursor = 'not-allowed';
     btn.onclick = null;
+    btn.classList.add('btn-waiting-wobble');
   }
   lineWatchTimer = setInterval(async () => {
     const userId = await window._getLatestLineUserId();
     if (userId) {
       const b = document.getElementById('btn-register');
       if (b) {
+        b.classList.remove('btn-waiting-wobble');
         b.textContent = '✅ 受付を完了する';
         b.style.background = '#27ae60';
         b.style.color = '#fff';
@@ -364,6 +375,7 @@ function stopLineWatch() {
   }
   const btn = document.getElementById('btn-register');
   if (btn && btn.style.background === 'rgb(221, 213, 192)') {
+    btn.classList.remove('btn-waiting-wobble');
     btn.textContent = '受付を完了する';
     btn.style.background = '';
     btn.style.color = '';
