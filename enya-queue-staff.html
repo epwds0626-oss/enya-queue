@@ -56,6 +56,7 @@
   .btn-call { padding:8px 12px; background:var(--orange); color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
   .btn-seat { padding:8px 12px; background:var(--green); color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
   .btn-absent { padding:7px 12px; background:#fff; color:var(--red); border:1px solid var(--red); border-radius:8px; font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .btn-recall { padding:8px 12px; background:#fff; color:var(--orange); border:1px solid var(--orange); border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
   .btn-cancel { padding:7px 12px; background:#fff; color:var(--red); border:1px solid var(--red); border-radius:8px; font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; }
   .btn-memo { padding:7px 12px; background:#fff; color:var(--gray); border:1px solid var(--border); border-radius:8px; font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; }
   .memo-area { margin-top:8px; display:flex; gap:6px; }
@@ -275,6 +276,7 @@ function renderEntries(entries, mode) {
     if (e.status === 'called') {
       actions = `<div class="queue-actions">
         <button class="btn-seat" onclick="seatCustomer('${e.key}','${e.name}')">✅ 案内</button>
+        <button class="btn-recall" onclick="recallCustomer('${e.key}','${e.name}',${e.total},'${e.lineUserId||''}',${!!e.isBell},${e.bellNo||0})">🔁 もう一度呼出</button>
         <button class="btn-absent" onclick="absentCustomer('${e.key}','${e.name}')">不在</button>
       </div>`;
     }
@@ -331,14 +333,17 @@ window.submitBell = async function() {
   showToast('🔔 ベル' + selectedBellNo + '番を設定しました');
 };
 
-window.callCustomer = async function(key, name, total, lineUserId, isBell, bellNo) {
-  if (!confirm(name + ' 様（' + total + '名）を呼び出しますか？')) return;
+window.callCustomer = async function(key, name, total, lineUserId, isBell, bellNo, isRecall) {
+  const confirmMsg = isRecall
+    ? (name + ' 様（' + total + '名）にもう一度呼び出しをしますか？')
+    : (name + ' 様（' + total + '名）を呼び出しますか？');
+  if (!confirm(confirmMsg)) return;
   showOverlay(true);
   try {
     if (!isBell && lineUserId && lineUserId !== '' && lineUserId !== 'undefined') {
       const url = GAS_URL + '?action=call&userId=' + encodeURIComponent(lineUserId) + '&name=' + encodeURIComponent(name) + '&total=' + total;
       await fetch(url, {mode:'no-cors'});
-      showToast('📲 ' + name + ' 様にLINE通知しました');
+      showToast((isRecall ? '🔁 ' : '📲 ') + name + ' 様に' + (isRecall ? '再度' : '') + 'LINE通知しました');
     } else if (isBell) {
       showToast('🔔 ベル' + bellNo + '番を鳴らしてください');
     } else {
@@ -349,6 +354,12 @@ window.callCustomer = async function(key, name, total, lineUserId, isBell, bellN
     await update(ref(db, 'enya-queue/' + key), { status:'called', calledAt: Date.now() });
   }
   showOverlay(false);
+};
+
+// もう一度呼出（気づかないお客様への再通知）。通知処理はcallCustomerを再利用。
+// statusは既にcalledのまま。confirm文言と成功トーストだけ再通知向けに切り替わる。
+window.recallCustomer = function(key, name, total, lineUserId, isBell, bellNo) {
+  return window.callCustomer(key, name, total, lineUserId, isBell, bellNo, true);
 };
 
 window.seatCustomer = async function(key, name) {
