@@ -114,6 +114,29 @@
   .overlay-box { background:#fff; border-radius:12px; padding:24px 32px; text-align:center; font-size:15px; color:var(--navy); font-weight:600; }
   .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(100px); background:var(--navy); color:#fff; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:600; transition:transform .3s; z-index:400; white-space:nowrap; }
   .toast.show { transform:translateX(-50%) translateY(0); }
+  /* 履歴：本日/過去トグル */
+  .hist-toggle { display:flex; gap:8px; margin-bottom:12px; }
+  .hist-tab { flex:1; padding:10px; background:#fff; border:1px solid var(--line,#e0dccb); border-radius:8px; font-size:14px; font-weight:600; color:#888; cursor:pointer; font-family:inherit; }
+  .hist-tab.active { background:var(--navy,#1a2b4a); color:#fff; border-color:var(--navy,#1a2b4a); }
+  .hist-hint, .hist-daylabel { text-align:center; color:#999; font-size:13px; padding:14px 0; }
+  .hist-daylabel { color:#333; font-weight:700; border-bottom:1px solid #eee; margin-bottom:8px; }
+  /* 月間カレンダー */
+  #hist-calendar { background:#fff; border:1px solid var(--line,#e0dccb); border-radius:10px; padding:10px; margin-bottom:12px; }
+  .cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .cal-title { font-size:15px; font-weight:700; color:#333; }
+  .cal-nav { width:34px; height:34px; border:none; background:#f2efe6; border-radius:8px; font-size:18px; cursor:pointer; color:#555; font-family:inherit; }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+  .cal-dow { text-align:center; font-size:11px; color:#999; padding:4px 0; font-weight:600; }
+  .cal-dow.sun { color:#d32f2f; } .cal-dow.sat { color:#1565c0; }
+  .cal-cell { position:relative; aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:8px; font-size:13px; color:#ccc; }
+  .cal-cell.empty { background:transparent; }
+  .cal-cell.has { background:#f2efe6; color:#333; cursor:pointer; font-weight:600; }
+  .cal-cell.has:hover { background:#e6e0d0; }
+  .cal-cell.today { outline:2px solid var(--gold,#c9a24b); }
+  .cal-cell.sel { background:var(--navy,#1a2b4a); color:#fff; }
+  .cal-d { line-height:1; }
+  .cal-badge { margin-top:2px; font-size:10px; background:var(--gold,#c9a24b); color:#fff; border-radius:10px; padding:1px 6px; font-weight:700; }
+  .cal-cell.sel .cal-badge { background:#fff; color:var(--navy,#1a2b4a); }
 </style>
 </head>
 <body>
@@ -143,7 +166,14 @@
     </div>
     <div id="queue-waiting" class="queue-list"></div>
     <div id="queue-called" class="queue-list" style="display:none"></div>
-    <div id="queue-all" class="queue-list" style="display:none"></div>
+    <div id="queue-all" style="display:none">
+      <div class="hist-toggle">
+        <button id="hist-today-btn" class="hist-tab active" onclick="setHistMode('today')">本日</button>
+        <button id="hist-past-btn" class="hist-tab" onclick="setHistMode('past')">過去</button>
+      </div>
+      <div id="hist-calendar" style="display:none"></div>
+      <div id="hist-list" class="queue-list"></div>
+    </div>
   </div>
 </div>
 
@@ -224,11 +254,96 @@ onValue(queueRef, (snapshot) => {
 function renderAll() {
   const waiting = allEntries.filter(e => e.status === 'waiting');
   const called  = allEntries.filter(e => e.status === 'called');
-  const history = allEntries.filter(e => ['seated','cancelled','absent'].includes(e.status)).reverse();
+  historyAll = allEntries.filter(e => ['seated','cancelled','absent'].includes(e.status)).reverse();
   document.getElementById('queue-waiting').innerHTML = renderEntries(waiting, 'waiting');
   document.getElementById('queue-called').innerHTML  = renderEntries(called, 'called');
-  document.getElementById('queue-all').innerHTML     = renderEntries(history, 'history');
+  renderHistoryView();
 }
+
+// ---- 履歴表示（本日／過去カレンダー）----
+let historyAll = [];          // seated/absent/cancelled の全件（新しい順）
+let histMode = 'today';       // 'today' | 'past'
+let histCalMonth = null;      // 過去カレンダーで表示中の月（Date, 月初）
+let histSelectedDay = null;   // 過去で選択中の日（'YYYY-MM-DD'）
+
+function dayKey(t) {           // タイムスタンプ→'YYYY-MM-DD'（暦通り・ローカル）
+  const d = new Date(t || 0);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function todayKey() { return dayKey(Date.now()); }
+
+window.setHistMode = function(mode) {
+  histMode = mode;
+  document.getElementById('hist-today-btn').classList.toggle('active', mode==='today');
+  document.getElementById('hist-past-btn').classList.toggle('active', mode==='past');
+  if (mode === 'past' && !histCalMonth) {
+    const now = new Date();
+    histCalMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  renderHistoryView();
+};
+
+function renderHistoryView() {
+  const cal = document.getElementById('hist-calendar');
+  const list = document.getElementById('hist-list');
+  if (!cal || !list) return;
+  if (histMode === 'today') {
+    cal.style.display = 'none';
+    const tk = todayKey();
+    const todays = historyAll.filter(e => dayKey(e.createdAt) === tk);
+    list.innerHTML = renderEntries(todays, 'history');
+  } else {
+    cal.style.display = 'block';
+    cal.innerHTML = renderCalendar();
+    if (histSelectedDay) {
+      const sel = historyAll.filter(e => dayKey(e.createdAt) === histSelectedDay);
+      list.innerHTML = '<div class="hist-daylabel">' + histSelectedDay + ' の履歴</div>' + renderEntries(sel, 'history');
+    } else {
+      list.innerHTML = '<div class="hist-hint">日付を選ぶとその日の履歴が表示されます</div>';
+    }
+  }
+}
+
+function renderCalendar() {
+  const y = histCalMonth.getFullYear(), m = histCalMonth.getMonth();
+  // その月の日別件数を集計
+  const counts = {};
+  historyAll.forEach(e => {
+    const k = dayKey(e.createdAt);
+    if (k.startsWith(y + '-' + String(m+1).padStart(2,'0'))) counts[k] = (counts[k]||0)+1;
+  });
+  const first = new Date(y, m, 1);
+  const startDow = first.getDay();           // 0=日
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const tk = todayKey();
+  let html = '<div class="cal-head">'
+    + '<button class="cal-nav" onclick="histCalMove(-1)">‹</button>'
+    + '<span class="cal-title">' + y + '年' + (m+1) + '月</span>'
+    + '<button class="cal-nav" onclick="histCalMove(1)">›</button></div>';
+  html += '<div class="cal-grid">';
+  ['日','月','火','水','木','金','土'].forEach((d,i) =>
+    html += '<div class="cal-dow' + (i===0?' sun':(i===6?' sat':'')) + '">' + d + '</div>');
+  for (let i=0;i<startDow;i++) html += '<div class="cal-cell empty"></div>';
+  for (let d=1; d<=daysInMonth; d++) {
+    const k = y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const c = counts[k] || 0;
+    const cls = 'cal-cell' + (c>0?' has':'') + (k===histSelectedDay?' sel':'') + (k===tk?' today':'');
+    const onclick = c>0 ? ' onclick="histPickDay(\'' + k + '\')"' : '';
+    html += '<div class="' + cls + '"' + onclick + '><span class="cal-d">' + d + '</span>'
+      + (c>0?'<span class="cal-badge">' + c + '</span>':'') + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+window.histCalMove = function(delta) {
+  histCalMonth = new Date(histCalMonth.getFullYear(), histCalMonth.getMonth()+delta, 1);
+  renderHistoryView();
+};
+window.histPickDay = function(k) {
+  histSelectedDay = (histSelectedDay === k) ? null : k;
+  renderHistoryView();
+};
 
 function ts(t) { return t ? new Date(t).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) : '--:--'; }
 
@@ -427,8 +542,10 @@ window.closeModal = function(id) {
 window.switchTab = function(tab) {
   ['waiting','called','all'].forEach(t => {
     document.getElementById('tab-'+t).classList.toggle('active', t===tab);
-    document.getElementById('queue-'+t).style.display = t===tab ? 'flex' : 'none';
+    const el = document.getElementById('queue-'+t);
+    el.style.display = t===tab ? (t==='all' ? 'block' : 'flex') : 'none';
   });
+  if (tab === 'all') renderHistoryView();
 };
 
 function showOverlay(s) { document.getElementById('overlay').classList.toggle('show',s); }
