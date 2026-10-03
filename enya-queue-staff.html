@@ -357,7 +357,9 @@ function renderEntries(entries, mode) {
     let tag = '';
     if (e.status==='called')    tag = '<span class="status-tag called">呼び出し済</span>';
     if (e.status==='seated')    tag = '<span class="status-tag seated">着席済</span>';
-    if (e.status==='cancelled') tag = '<span class="status-tag cancelled">キャンセル</span>';
+    if (e.status==='cancelled') tag = e.cancelledBy==='staff'
+      ? '<span class="status-tag cancelled">スタッフキャンセル</span>'
+      : '<span class="status-tag cancelled">キャンセル</span>';
     if (e.status==='absent')    tag = '<span class="status-tag absent">不在</span>';
     if (e.isReserved && e.status==='waiting') tag = '<span class="status-tag reserved">予約</span>';
 
@@ -491,8 +493,8 @@ window.absentCustomer = async function(key, name) {
 
 window.cancelCustomer = async function(key, name) {
   if (!confirm(name + ' 様をキャンセルしますか？')) return;
-  await update(ref(db, 'enya-queue/' + key), { status:'cancelled', cancelledAt: Date.now() });
-  showToast('❌ ' + name + ' 様　キャンセル');
+  await update(ref(db, 'enya-queue/' + key), { status:'cancelled', cancelledBy:'staff', cancelledAt: Date.now() });
+  showToast('❌ ' + name + ' 様　スタッフキャンセル');
 };
 
 window.saveMemo = async function(key) {
