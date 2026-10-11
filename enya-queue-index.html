@@ -65,15 +65,11 @@
   .wait-unit { font-size:16px; color:var(--gray); margin-top:4px; }
   .wait-my-info { font-size:14px; color:var(--text); margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
   .wait-note { font-size:12px; color:var(--gray); text-align:center; line-height:1.7; margin-bottom:16px; }
+  .auto-return { font-size:12px; color:var(--gray); text-align:center; margin-top:10px; }
   .btn-primary { width:100%; padding:16px; background:var(--navy); color:#fff; border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; letter-spacing:.06em; transition:all .15s; font-family:inherit; }
   .btn-primary:active { transform:scale(.98); background:#0f1a33; }
   .btn-primary:disabled { background:var(--border); color:var(--gray); cursor:not-allowed; }
   .btn-home { width:100%; padding:14px; background:#fff; color:var(--navy); border:2px solid var(--navy); border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; margin-top:10px; }
-  @keyframes pulse {
-    0% { transform:scale(1); }
-    50% { transform:scale(1.03); box-shadow:0 0 0 6px rgba(39,174,96,.3); }
-    100% { transform:scale(1); }
-  }
   .btn-back { display:block; text-align:center; margin-top:14px; font-size:13px; color:var(--gray); cursor:pointer; padding:4px; }
   /* 最初からやり直す（全消しリセット） */
   .btn-reset { display:block; text-align:center; margin-top:10px; font-size:13px; color:var(--reset); cursor:pointer; padding:6px; font-weight:600; }
@@ -155,7 +151,7 @@
       <span class="btn-reset" onclick="resetAll()">↺ 最初からやり直す</span>
     </div>
 
-    <!-- STEP 4: LINE登録 -->
+    <!-- STEP 4: LINE登録（「1」受信で自動的に受付完了） -->
     <div class="screen" id="screen4">
       <div class="screen-title">LINEで通知を受け取る</div>
       <p class="screen-desc">順番になったらLINEでお知らせします</p>
@@ -166,10 +162,10 @@
       <div class="line-steps">
         <p>① えんやどっと丸のLINEを開く</p>
         <p style="color:#d32f2f;font-weight:700;">② トーク画面で<strong style="font-size:16px;color:#d32f2f;">「1」と送信</strong>してください</p>
-        <p>③ 受付ボタンが緑色に変わったら押してください</p>
+        <p>③ 送信すると<strong>自動で受付完了</strong>になります</p>
       </div>
-      <button class="btn-primary" id="btn-register" onclick="registerQueue(false)">受付を完了する</button>
-      <button class="btn-no-line" onclick="registerQueue(true)">🔔 LINEをお持ちでない方はこちら</button>
+      <button class="btn-primary btn-waiting-wobble" id="btn-register" disabled>📲 LINEからの「1」を待っています...</button>
+      <button class="btn-no-line" style="margin-top:12px;" onclick="registerQueue(true)">🔔 LINEをお持ちでない方はこちら</button>
       <span class="btn-back" onclick="goStep(3)">← 戻る</span>
       <span class="btn-reset" onclick="resetAll()">↺ 最初からやり直す</span>
     </div>
@@ -198,6 +194,7 @@
         <div class="bell-waiting-desc">順番になりましたらベルでお知らせします<br>店内またはお車でお待ちください</div>
       </div>
       <button class="btn-home" onclick="location.reload()">🏠 最初のページに戻る</button>
+      <p class="auto-return" id="auto-return-5b"></p>
     </div>
 
     <!-- STEP 5: 完了（LINE） -->
@@ -216,13 +213,14 @@
       </div>
       <p class="wait-note">順番になりましたらLINEにご連絡します<br>店内またはお車でお待ちください</p>
       <button class="btn-home" onclick="location.reload()">🏠 最初のページに戻る</button>
+      <p class="auto-return" id="auto-return-5"></p>
     </div>
   </div>
 </div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getDatabase, ref, push, remove, onValue, serverTimestamp, get }
+import { getDatabase, ref, push, remove, onValue, serverTimestamp, get, query, orderByChild, startAt }
   from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 
 const MINS_PER_GROUP = 10;
@@ -240,8 +238,17 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const queueRef = ref(db, 'enya-queue');
 
+// タブレットの時計ズレ対策：Firebaseサーバー時刻との差を取得
+let serverOffset = 0;
+onValue(ref(db, '.info/serverTimeOffset'), (s) => { serverOffset = s.val() || 0; });
+window._serverNow = () => Date.now() + serverOffset;
+
+// 最新の待ちリスト（二重登録チェック用）
+let latestQueue = {};
+
 onValue(queueRef, (snapshot) => {
   const data = snapshot.val();
+  latestQueue = data || {};
   let count = 0;
   if (data) Object.values(data).forEach(v => { if (v.status === 'waiting') count++; });
   const el = document.getElementById('wait-count');
@@ -263,22 +270,26 @@ onValue(queueRef, (snapshot) => {
   }
 });
 
-async function getLatestLineUserId() {
-  try {
-    const usersRef = ref(db, 'enya-line-users');
-    const snapshot = await get(usersRef);
-    if (!snapshot.exists()) return null;
-    const data = snapshot.val();
-    const entries = Object.entries(data);
-    if (!entries.length) return null;
-    entries.sort((a, b) => b[1].addedAt - a[1].addedAt);
-    const [userId, info] = entries[0];
-    if (Date.now() - info.addedAt < 5 * 60 * 1000) return userId;
-    return null;
-  } catch(e) { return null; }
+// すでに「待ち」状態で登録済みのLINEユーザーか
+function isUserWaiting(userId) {
+  return Object.values(latestQueue).some(v => v.lineUserId === userId && v.status === 'waiting');
 }
 
-window._getLatestLineUserId = getLatestLineUserId;
+// 「1」の受信をリアルタイム監視（since以降に送信した人だけ）
+// 戻り値：監視を止める関数
+window._watchLineUsers = (since, onDetect) => {
+  const q = query(ref(db, 'enya-line-users'), orderByChild('addedAt'), startAt(since));
+  return onValue(q, (snap) => {
+    const data = snap.val();
+    if (!data) return;
+    const hits = Object.entries(data)
+      .filter(([uid, v]) => v.addedAt >= since && !isUserWaiting(uid))
+      .sort((a, b) => b[1].addedAt - a[1].addedAt);
+    if (hits.length) onDetect(hits[0][0]);
+  });
+};
+
+window._isUserWaiting = isUserWaiting;
 window._push = push;
 window._remove = remove;
 window._get = get;
@@ -290,6 +301,9 @@ window._serverTimestamp = serverTimestamp;
 <script>
 let selectedAdult = null;
 let selectedChild = null;
+
+const AUTO_RETURN_SEC = 10;      // 完了画面から自動で最初に戻るまでの秒数
+const LINE_LOOKBACK_MS = 15000;  // LINE画面を開く少し前に送られた「1」も拾う猶予
 
 function buildGrid(id, start, end, onSelect, btnId) {
   const grid = document.getElementById(id);
@@ -322,6 +336,12 @@ function resetAll() {
   }
 }
 
+function showScreen(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function goStep(step) {
   if (step === 1) buildAdultGrid();
   if (step === 2) buildChildGrid();
@@ -333,8 +353,7 @@ function goStep(step) {
   if (step !== 4) stopLineWatch();
 
   const screenId = (step === '4b') ? 'screen4b' : 'screen' + step;
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(screenId).classList.add('active');
+  showScreen(screenId);
   const dotStep = (step === '4b') ? 4 : step;
   for (let i = 0; i < 5; i++) {
     const dot = document.getElementById('dot' + i);
@@ -343,114 +362,104 @@ function goStep(step) {
     if (i === dotStep) dot.classList.add('active');
     else if (i < dotStep) dot.classList.add('done');
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// LINE検知監視
-let lineWatchTimer = null;
-let lineWatchActive = false;
+// ===== LINE「1」受信 → 自動で受付確定 =====
+let lineWatchUnsub = null;
+let lineRegistering = false;
+let lineRegistered = false;
 
 function startLineWatch() {
-  if (lineWatchActive) return;
-  lineWatchActive = true;
-  const btn = document.getElementById('btn-register');
-  if (btn) {
-    btn.textContent = '📲 LINEからの「1」を待っています...';
-    btn.style.background = '#ddd5c0';
-    btn.style.color = '#8a8a8a';
-    btn.style.cursor = 'not-allowed';
-    btn.onclick = null;
-    btn.classList.add('btn-waiting-wobble');
-  }
-  lineWatchTimer = setInterval(async () => {
-    const userId = await window._getLatestLineUserId();
-    if (userId) {
-      const b = document.getElementById('btn-register');
-      if (b) {
-        b.classList.remove('btn-waiting-wobble');
-        b.textContent = '✅ 受付を完了する';
-        b.style.background = '#27ae60';
-        b.style.color = '#fff';
-        b.style.cursor = 'pointer';
-        b.style.animation = 'pulse 0.6s ease 2';
-        b.onclick = () => registerQueue(false);
-      }
-      stopLineWatch();
-    }
-  }, 2000);
+  if (lineWatchUnsub || lineRegistered) return;
+  const since = window._serverNow() - LINE_LOOKBACK_MS;
+  lineWatchUnsub = window._watchLineUsers(since, (userId) => {
+    if (lineRegistering || lineRegistered) return;
+    autoRegisterLine(userId);
+  });
 }
 
 function stopLineWatch() {
-  lineWatchActive = false;
-  if (lineWatchTimer) {
-    clearInterval(lineWatchTimer);
-    lineWatchTimer = null;
-  }
-  const btn = document.getElementById('btn-register');
-  if (btn && btn.style.background === 'rgb(221, 213, 192)') {
-    btn.classList.remove('btn-waiting-wobble');
-    btn.textContent = '受付を完了する';
-    btn.style.background = '';
-    btn.style.color = '';
-    btn.style.cursor = '';
-    btn.onclick = () => registerQueue(false);
+  if (lineWatchUnsub) {
+    lineWatchUnsub();
+    lineWatchUnsub = null;
   }
 }
 
-async function registerQueue(isBell) {
+async function autoRegisterLine(lineUserId) {
   const name = document.getElementById('name-input').value.trim();
-  if (!name) return;
+  if (!name || selectedAdult === null || selectedChild === null) return;
+  if (window._isUserWaiting(lineUserId)) return; // 二重登録防止
 
-  if (isBell) {
-    try {
-      const entry = {
-        name,
-        adult: selectedAdult,
-        child: selectedChild,
-        total: selectedAdult + selectedChild,
-        status: 'waiting',
-        lineUserId: '',
-        isBell: true,
-        bellNo: null,
-        needsBell: true,
-        createdAt: window._serverTimestamp()
-      };
-      const result = await window._push(window._queueRef, entry);
-      window._lastBellKey = result.key;
-    } catch(e) { console.error(e); }
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('screen4b').classList.add('active');
-    document.getElementById('steps').style.display = 'none';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    // ベル完了はお客様がボタンで操作
-    return;
-  }
-
+  lineRegistering = true;
+  stopLineWatch();
   const btn = document.getElementById('btn-register');
-  btn.disabled = true;
+  btn.classList.remove('btn-waiting-wobble');
   btn.textContent = '登録中...';
+
   try {
-    const lineUserId = await window._getLatestLineUserId();
     const entry = {
       name,
       adult: selectedAdult,
       child: selectedChild,
       total: selectedAdult + selectedChild,
       status: 'waiting',
-      lineUserId: lineUserId || '',
+      lineUserId,
       isBell: false,
       createdAt: window._serverTimestamp()
     };
     await window._push(window._queueRef, entry);
+    lineRegistered = true;
     document.getElementById('my-info').textContent = name + ' 様　大人' + selectedAdult + '名・子ども' + selectedChild + '名';
-    goStep(5);
     document.getElementById('steps').style.display = 'none';
-  } catch(e) {
+    showScreen('screen5');
+    startAutoReturn('auto-return-5');
+  } catch (e) {
     console.error(e);
-    btn.disabled = false;
-    btn.textContent = '受付を完了する';
-    alert('エラーが発生しました。もう一度お試しください。');
+    lineRegistering = false;
+    btn.classList.add('btn-waiting-wobble');
+    btn.textContent = '📲 LINEからの「1」を待っています...';
+    alert('登録でエラーが発生しました。お手数ですがもう一度LINEで「1」を送信してください。');
+    startLineWatch();
   }
+}
+
+// 完了画面から自動で最初のページへ戻る
+function startAutoReturn(elId) {
+  let sec = AUTO_RETURN_SEC;
+  const el = document.getElementById(elId);
+  const tick = () => { if (el) el.textContent = sec + '秒後に最初のページに戻ります'; };
+  tick();
+  const t = setInterval(() => {
+    sec--;
+    if (sec <= 0) { clearInterval(t); location.reload(); return; }
+    tick();
+  }, 1000);
+}
+
+// ベル（LINEなし）受付
+async function registerQueue(isBell) {
+  if (!isBell) return;
+  const name = document.getElementById('name-input').value.trim();
+  if (!name) return;
+  stopLineWatch();
+  try {
+    const entry = {
+      name,
+      adult: selectedAdult,
+      child: selectedChild,
+      total: selectedAdult + selectedChild,
+      status: 'waiting',
+      lineUserId: '',
+      isBell: true,
+      bellNo: null,
+      needsBell: true,
+      createdAt: window._serverTimestamp()
+    };
+    const result = await window._push(window._queueRef, entry);
+    window._lastBellKey = result.key;
+  } catch(e) { console.error(e); }
+  document.getElementById('steps').style.display = 'none';
+  showScreen('screen4b');
 }
 
 window.goStep = goStep;
@@ -460,8 +469,8 @@ window.resetAll = resetAll;
 
 window.completeBellEntry = function() {
   document.getElementById('steps').style.display = 'none';
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('screen5b').classList.add('active');
+  showScreen('screen5b');
+  startAutoReturn('auto-return-5b');
 };
 </script>
 </body>
