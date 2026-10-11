@@ -277,15 +277,18 @@ function isUserWaiting(userId) {
 
 // 「1」の受信をリアルタイム監視（since以降に送信した人だけ）
 // 戻り値：監視を止める関数
-window._watchLineUsers = (since, onDetect) => {
+window._watchLineUsers = (since, onDetect, onAlready) => {
   const q = query(ref(db, 'enya-line-users'), orderByChild('addedAt'), startAt(since));
   return onValue(q, (snap) => {
     const data = snap.val();
     if (!data) return;
-    const hits = Object.entries(data)
-      .filter(([uid, v]) => v.addedAt >= since && !isUserWaiting(uid))
+    const recent = Object.entries(data)
+      .filter(([uid, v]) => v.addedAt >= since)
       .sort((a, b) => b[1].addedAt - a[1].addedAt);
-    if (hits.length) onDetect(hits[0][0]);
+    const fresh = recent.filter(([uid]) => !isUserWaiting(uid));
+    if (fresh.length) { onDetect(fresh[0][0]); return; }
+    // 「1」は届いたが、そのLINEはすでに待ちリストにいる
+    if (recent.length && onAlready) onAlready(recent[0][0]);
   });
 };
 
@@ -375,6 +378,13 @@ function startLineWatch() {
   lineWatchUnsub = window._watchLineUsers(since, (userId) => {
     if (lineRegistering || lineRegistered) return;
     autoRegisterLine(userId);
+  }, () => {
+    const btn = document.getElementById('btn-register');
+    if (btn && !lineRegistering && !lineRegistered) {
+      btn.classList.remove('btn-waiting-wobble');
+      btn.style.fontSize = '13px';
+      btn.textContent = '⚠️ このLINEはすでに受付済みです。スタッフにお声がけください';
+    }
   });
 }
 
